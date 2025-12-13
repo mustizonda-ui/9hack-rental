@@ -1,42 +1,89 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Scooter App</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>X-DASH OMNI BYPASS</title>
     <style>
-        body { font-family: Arial; margin: 20px; }
-        button { padding: 15px; margin: 10px; font-size: 16px; display: block; }
+        :root { --neon: #00f3ff; --bg: #050505; --card: #121214; }
+        body { background: var(--bg); color: white; font-family: 'Helvetica Neue', sans-serif; margin: 0; }
+        .hud-top { display: flex; justify-content: space-around; padding: 20px; background: var(--card); border-bottom: 1px solid #333; }
+        .metric { text-align: center; }
+        .m-lab { font-size: 10px; color: #888; }
+        .m-val { font-size: 20px; font-weight: bold; color: var(--neon); }
+        .gauge { height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #spd { font-size: 100px; font-weight: 800; line-height: 1; }
+        .controls { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { background: #222; border: 1px solid var(--neon); color: var(--neon); padding: 15px; border-radius: 10px; font-weight: bold; }
+        button.active { background: var(--neon); color: black; }
+        #console { height: 100px; background: black; font-family: monospace; font-size: 10px; padding: 10px; overflow-y: scroll; color: #0f0; margin: 10px; border: 1px solid #333; }
     </style>
 </head>
 <body>
-    <h1>🛴 Scooter Rental</h1>
-    <button id="connectBtn">Connect Bluetooth</button>
-    <div id="status">Ready to connect</div>
 
-    <script>
-        document.getElementById('connectBtn').onclick = async function() {
-            try {
-                document.getElementById('status').textContent = "Scanning...";
-                
-                if (!navigator.bluetooth) {
-                    document.getElementById('status').textContent = "Use Bluefy browser!";
-                    return;
-                }
-                
-                let device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true
-                });
-                
-                document.getElementById('status').textContent = "Connected to: " + device.name;
-                
-            } catch(error) {
-                document.getElementById('status').textContent = "Error: " + error.message;
-            }
-        };
-    </script>
+    <div class="hud-top">
+        <div class="metric"><div class="m-lab">VOLTS</div><div class="m-val" id="v">00.0</div></div>
+        <div class="metric"><div class="m-lab">AMPS</div><div class="m-val" id="a">0.0</div></div>
+        <div class="metric"><div class="m-lab">TEMP</div><div class="m-val" id="t">0°</div></div>
+    </div>
+
+    <div class="gauge">
+        <div id="spd">00</div>
+        <div style="color: #444; letter-spacing: 5px;">KM/H</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="connect()" id="cBtn">CONNECT</button>
+        <button onclick="toggleHB()" id="hBtn">HEARTBEAT</button>
+        <button onclick="unlock()" style="grid-column: span 2; border-color: red; color: red;">FORCE GLOBAL UNLOCK</button>
+    </div>
+
+    <div id="console">SNIFFER: INITIALIZING...</div>
+
+<script>
+    let tx, hb = false;
+    async function log(m, hex=false) {
+        const c = document.getElementById('console');
+        c.innerHTML += `<div>${hex ? '<b>HEX></b> ' : ''}${m}</div>`;
+        c.scrollTop = c.scrollHeight;
+    }
+
+    async function connect() {
+        const d = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: 'Ninebot' }, { namePrefix: 'Segway' }, { namePrefix: 'MAX' }],
+            optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+        });
+        const g = await d.gatt.connect();
+        const s = await g.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+        tx = await s.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+        document.getElementById('cBtn').innerText = "LINKED";
+        log("Connected to " + d.name);
+    }
+
+    function toggleHB() {
+        hb = !hb;
+        document.getElementById('hBtn').classList.toggle('active');
+        if(hb) setInterval(() => { if(hb) send(0x3D, 0x01, 0x20, [0x01]); }, 400);
+    }
+
+    async function send(target, cmd, addr, payload) {
+        let p = [0x5A, 0xA5, payload.length + 2, 0x3E, target, cmd, addr, ...payload];
+        let cs = 0; for (let i = 2; i < p.length; i++) cs += p[i];
+        cs = (cs ^ 0xFFFF) & 0xFFFF;
+        p.push(cs & 0xFF, (cs >> 8) & 0xFF);
+        await tx.writeValue(new Uint8Array(p));
+        log(p.map(x => x.toString(16).padStart(2,'0')).join(' '), true);
+    }
+
+    function unlock() {
+        // SN Spoofing + Speed Maxing
+        send(0x20, 0x03, 0x0E, [0x4E, 0x34, 0x47, 0x54, 0x41]); // N4GTA
+        setTimeout(() => send(0x20, 0x03, 0x70, [0xFF, 0x00]), 300);
+        log("SPOOF INJECTED");
+    }
+</script>
 </body>
-<
-
+</html
 
 
 
